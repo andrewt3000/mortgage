@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+
+import { submitLead } from "@/app/actions";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -203,12 +205,14 @@ function QuestionCard({
 function InputCard({
   prompt,
   nextDisabled,
+  nextLabel = "Next",
   onNext,
   onBack,
   children,
 }: {
   prompt: string;
   nextDisabled: boolean;
+  nextLabel?: string;
   onNext: () => void;
   onBack: () => void;
   children: React.ReactNode;
@@ -225,7 +229,7 @@ function InputCard({
             Back
           </Button>
           <Button size="lg" disabled={nextDisabled} onClick={onNext}>
-            Next
+            {nextLabel}
           </Button>
         </div>
       </CardContent>
@@ -312,8 +316,49 @@ export default function Home() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [zip, setZip] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [isSubmitting, startSubmitting] = useTransition();
 
   const isBuy = interest === "buy";
+
+  function handleSubmit() {
+    setSubmitError("");
+    startSubmitting(async () => {
+      const result = await submitLead({
+        flow: interest,
+        propertyType,
+        creditProfile,
+        bankruptcy,
+        ...(isBuy
+          ? {
+              buy: {
+                propertyUse,
+                buyingStage,
+                purchasePrice,
+                downPayment,
+                latePayments,
+                foreclosure,
+              },
+            }
+          : {
+              refinance: {
+                secondMortgage,
+                veteran,
+                workStatus,
+                reason: refinanceReason,
+                homeValue,
+                mortgageBalance,
+              },
+            }),
+        contact: { firstName, lastName, phone, email, address, city, state, zip },
+      });
+      if (result.ok) {
+        setStep("summary");
+      } else {
+        setSubmitError(result.error);
+      }
+    });
+  }
 
   const summaryEntries: { label: string; value: string }[] = [
     { label: "Interested in", value: labelFor(INTEREST_OPTIONS, interest) },
@@ -693,9 +738,14 @@ export default function Home() {
           <InputCard
             prompt="Current mailing address"
             nextDisabled={
-              !address.trim() || !city.trim() || !state.trim() || !zip.trim()
+              !address.trim() ||
+              !city.trim() ||
+              !state.trim() ||
+              !zip.trim() ||
+              isSubmitting
             }
-            onNext={() => setStep("summary")}
+            nextLabel={isSubmitting ? "Submitting…" : "Next"}
+            onNext={handleSubmit}
             onBack={() => setStep("email")}
           >
             <TextField
@@ -729,6 +779,9 @@ export default function Home() {
                 onChange={setZip}
               />
             </div>
+            {submitError && (
+              <p className="text-sm text-destructive">{submitError}</p>
+            )}
           </InputCard>
         )}
 
