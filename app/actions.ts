@@ -39,6 +39,7 @@ const REFINANCE_REASONS = new Set([
 const YES_NO = new Set(["yes", "no"]);
 
 export type LeadSubmission = {
+  sessionId: string;
   flow: string;
   propertyType: string;
   creditProfile: string;
@@ -184,6 +185,10 @@ export async function submitLead(
     await client.db().collection("leads").insertOne({
       createdAt: new Date(),
       status: "new",
+      sessionId:
+        typeof submission.sessionId === "string"
+          ? submission.sessionId.slice(0, 64)
+          : null,
       flow: submission.flow,
       propertyType: submission.propertyType,
       creditProfile: submission.creditProfile,

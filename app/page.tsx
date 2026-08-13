@@ -318,13 +318,38 @@ export default function Home() {
   const [zip, setZip] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, startSubmitting] = useTransition();
+  const [sessionId] = useState(() => crypto.randomUUID());
 
   const isBuy = interest === "buy";
 
+  // Fire-and-forget funnel event; never awaited so navigation stays instant.
+  function trackStep(to: Step, answer?: Record<string, string>) {
+    const body = JSON.stringify({ sessionId, from: step, to, answer });
+    const sent = navigator.sendBeacon?.(
+      "/api/track",
+      new Blob([body], { type: "application/json" })
+    );
+    if (!sent) {
+      fetch("/api/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        keepalive: true,
+      }).catch(() => {});
+    }
+  }
+
+  function goToNext(to: Step, answer?: Record<string, string>) {
+    trackStep(to, answer);
+    setStep(to);
+  }
+
   function handleSubmit() {
     setSubmitError("");
+    trackStep("summary");
     startSubmitting(async () => {
       const result = await submitLead({
+        sessionId,
         flow: interest,
         propertyType,
         creditProfile,
@@ -447,7 +472,7 @@ export default function Home() {
             value={interest}
             onValueChange={setInterest}
             onNext={() =>
-              setStep(isBuy ? "propertyType" : "secondMortgage")
+              goToNext(isBuy ? "propertyType" : "secondMortgage", { interest })
             }
           />
         )}
@@ -458,7 +483,7 @@ export default function Home() {
             options={PROPERTY_TYPE_OPTIONS}
             value={propertyType}
             onValueChange={setPropertyType}
-            onNext={() => setStep("propertyUse")}
+            onNext={() => goToNext("propertyUse", { propertyType })}
             onBack={() => setStep("interest")}
           />
         )}
@@ -469,7 +494,7 @@ export default function Home() {
             options={PROPERTY_USE_OPTIONS}
             value={propertyUse}
             onValueChange={setPropertyUse}
-            onNext={() => setStep("buyingStage")}
+            onNext={() => goToNext("buyingStage", { propertyUse })}
             onBack={() => setStep("propertyType")}
           />
         )}
@@ -480,7 +505,7 @@ export default function Home() {
             options={BUYING_STAGE_OPTIONS}
             value={buyingStage}
             onValueChange={setBuyingStage}
-            onNext={() => setStep("purchasePrice")}
+            onNext={() => goToNext("purchasePrice", { buyingStage })}
             onBack={() => setStep("propertyUse")}
           />
         )}
@@ -489,7 +514,7 @@ export default function Home() {
           <InputCard
             prompt="What purchase price do you have in mind?"
             nextDisabled={!purchasePrice.trim()}
-            onNext={() => setStep("downPayment")}
+            onNext={() => goToNext("downPayment", { purchasePrice })}
             onBack={() => setStep("buyingStage")}
           >
             <AmountField
@@ -505,7 +530,7 @@ export default function Home() {
           <InputCard
             prompt="How much do you plan to use for a down payment?"
             nextDisabled={!downPayment.trim()}
-            onNext={() => setStep("creditProfile")}
+            onNext={() => goToNext("creditProfile", { downPayment })}
             onBack={() => setStep("purchasePrice")}
           >
             <AmountField
@@ -523,7 +548,7 @@ export default function Home() {
             options={CREDIT_PROFILE_OPTIONS}
             value={creditProfile}
             onValueChange={setCreditProfile}
-            onNext={() => setStep("latePayments")}
+            onNext={() => goToNext("latePayments", { creditProfile })}
             onBack={() => setStep("downPayment")}
           />
         )}
@@ -534,7 +559,7 @@ export default function Home() {
             options={LATE_PAYMENT_OPTIONS}
             value={latePayments}
             onValueChange={setLatePayments}
-            onNext={() => setStep("foreclosure")}
+            onNext={() => goToNext("foreclosure", { latePayments })}
             onBack={() => setStep("creditProfile")}
           />
         )}
@@ -545,7 +570,7 @@ export default function Home() {
             options={YES_NO_OPTIONS}
             value={foreclosure}
             onValueChange={setForeclosure}
-            onNext={() => setStep("buyBankruptcy")}
+            onNext={() => goToNext("buyBankruptcy", { foreclosure })}
             onBack={() => setStep("latePayments")}
           />
         )}
@@ -556,7 +581,7 @@ export default function Home() {
             options={YES_NO_OPTIONS}
             value={bankruptcy}
             onValueChange={setBankruptcy}
-            onNext={() => setStep("name")}
+            onNext={() => goToNext("name", { bankruptcy })}
             onBack={() => setStep("foreclosure")}
           />
         )}
@@ -567,7 +592,7 @@ export default function Home() {
             options={YES_NO_OPTIONS}
             value={secondMortgage}
             onValueChange={setSecondMortgage}
-            onNext={() => setStep("veteran")}
+            onNext={() => goToNext("veteran", { secondMortgage })}
             onBack={() => setStep("interest")}
           />
         )}
@@ -578,7 +603,7 @@ export default function Home() {
             options={YES_NO_OPTIONS}
             value={veteran}
             onValueChange={setVeteran}
-            onNext={() => setStep("workStatus")}
+            onNext={() => goToNext("workStatus", { veteran })}
             onBack={() => setStep("secondMortgage")}
           />
         )}
@@ -589,7 +614,7 @@ export default function Home() {
             options={WORK_STATUS_OPTIONS}
             value={workStatus}
             onValueChange={setWorkStatus}
-            onNext={() => setStep("bankruptcy")}
+            onNext={() => goToNext("bankruptcy", { workStatus })}
             onBack={() => setStep("veteran")}
           />
         )}
@@ -600,7 +625,7 @@ export default function Home() {
             options={YES_NO_OPTIONS}
             value={bankruptcy}
             onValueChange={setBankruptcy}
-            onNext={() => setStep("refinancePropertyType")}
+            onNext={() => goToNext("refinancePropertyType", { bankruptcy })}
             onBack={() => setStep("workStatus")}
           />
         )}
@@ -611,7 +636,7 @@ export default function Home() {
             options={PROPERTY_TYPE_OPTIONS}
             value={propertyType}
             onValueChange={setPropertyType}
-            onNext={() => setStep("refinanceReason")}
+            onNext={() => goToNext("refinanceReason", { propertyType })}
             onBack={() => setStep("bankruptcy")}
           />
         )}
@@ -622,7 +647,7 @@ export default function Home() {
             options={REFINANCE_REASON_OPTIONS}
             value={refinanceReason}
             onValueChange={setRefinanceReason}
-            onNext={() => setStep("refinanceCreditProfile")}
+            onNext={() => goToNext("refinanceCreditProfile", { refinanceReason })}
             onBack={() => setStep("refinancePropertyType")}
           />
         )}
@@ -633,7 +658,7 @@ export default function Home() {
             options={CREDIT_PROFILE_OPTIONS}
             value={creditProfile}
             onValueChange={setCreditProfile}
-            onNext={() => setStep("homeValue")}
+            onNext={() => goToNext("homeValue", { creditProfile })}
             onBack={() => setStep("refinanceReason")}
           />
         )}
@@ -642,7 +667,7 @@ export default function Home() {
           <InputCard
             prompt="What’s an estimate of your current home value?"
             nextDisabled={!homeValue.trim()}
-            onNext={() => setStep("mortgageBalance")}
+            onNext={() => goToNext("mortgageBalance", { homeValue })}
             onBack={() => setStep("refinanceCreditProfile")}
           >
             <AmountField
@@ -658,7 +683,7 @@ export default function Home() {
           <InputCard
             prompt="About how much is left on your mortgage?"
             nextDisabled={!mortgageBalance.trim()}
-            onNext={() => setStep("name")}
+            onNext={() => goToNext("name", { mortgageBalance })}
             onBack={() => setStep("homeValue")}
           >
             <AmountField
@@ -674,7 +699,7 @@ export default function Home() {
           <InputCard
             prompt="What’s your name?"
             nextDisabled={!firstName.trim() || !lastName.trim()}
-            onNext={() => setStep("phone")}
+            onNext={() => goToNext("phone")}
             onBack={() =>
               setStep(isBuy ? "buyBankruptcy" : "mortgageBalance")
             }
@@ -700,7 +725,7 @@ export default function Home() {
           <InputCard
             prompt="Phone number"
             nextDisabled={!phone.trim()}
-            onNext={() => setStep("email")}
+            onNext={() => goToNext("email")}
             onBack={() => setStep("name")}
           >
             <TextField
@@ -719,7 +744,7 @@ export default function Home() {
           <InputCard
             prompt="Email"
             nextDisabled={!email.trim()}
-            onNext={() => setStep("address")}
+            onNext={() => goToNext("address")}
             onBack={() => setStep("phone")}
           >
             <TextField
