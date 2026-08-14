@@ -464,6 +464,7 @@ export default function Home() {
         <h1 className="text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
           🐶 Fido Home Loans
         </h1>
+        <h6 className="text-red-500">This is a demo application. Do not enter real data.</h6>
 
         {step === "interest" && (
           <QuestionCard
